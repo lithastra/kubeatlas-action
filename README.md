@@ -152,6 +152,9 @@ A full workflow is in [`examples/policy-report-comment.yml`](./examples/policy-r
   cluster for you — use [`helm/kind-action`](https://github.com/helm/kind-action)
   or [`azure/k8s-set-context`](https://github.com/Azure/k8s-set-context)
   to prepare one first.
+- Compatible with KubeAtlas v1.4 and v1.5. v1.5 is a non-breaking
+  minor release, so the action needs no changes to work with it;
+  `policy-report` continues to function unchanged.
 
 ## Versioning
 
