@@ -89,22 +89,29 @@ install_kubeatlas() {
     *) echo "policy-report.sh: unsupported arch ${arch_raw}" >&2; exit 1 ;;
   esac
 
-  local archive url tmp
+  local archive url tmp bin_dir
   archive="kubeatlas_${semver}_${os}_${arch}.tar.gz"
   url="https://github.com/${REPO}/releases/download/${want}/${archive}"
   tmp="$(mktemp -d)"
-  trap 'rm -rf "${tmp}"' RETURN
+  bin_dir="${HOME}/.kubeatlas-action/bin"
 
-  echo "Downloading ${url}"
-  curl -fsSL -o "${tmp}/${archive}" "${url}"
-  curl -fsSL -o "${tmp}/checksums.txt" \
-    "https://github.com/${REPO}/releases/download/${want}/checksums.txt"
-  ( cd "${tmp}" && grep -F "${archive}" checksums.txt | sha256sum -c - )
+  # Keep cleanup inside a subshell whose EXIT trap runs while tmp is
+  # still in scope. A RETURN trap outlived this local variable and
+  # failed under `set -u` after install_kubeatlas returned.
+  (
+    trap 'rm -rf "${tmp}"' EXIT
 
-  tar -xzf "${tmp}/${archive}" -C "${tmp}"
-  local bin_dir="${HOME}/.kubeatlas-action/bin"
-  mkdir -p "${bin_dir}"
-  mv "${tmp}/kubeatlas" "${bin_dir}/kubeatlas"
+    echo "Downloading ${url}" >&2
+    curl -fsSL -o "${tmp}/${archive}" "${url}"
+    curl -fsSL -o "${tmp}/checksums.txt" \
+      "https://github.com/${REPO}/releases/download/${want}/checksums.txt"
+    ( cd "${tmp}" && grep -F "${archive}" checksums.txt | sha256sum -c - )
+
+    tar -xzf "${tmp}/${archive}" -C "${tmp}"
+    mkdir -p "${bin_dir}"
+    mv "${tmp}/kubeatlas" "${bin_dir}/kubeatlas"
+  )
+
   chmod +x "${bin_dir}/kubeatlas"
   export PATH="${bin_dir}:${PATH}"
   [[ -n "${GITHUB_PATH:-}" ]] && echo "${bin_dir}" >> "${GITHUB_PATH}"
@@ -143,7 +150,8 @@ render_markdown() {
   } > "${OUT}"
 }
 
-diagnose_json | render_markdown
+diagnose_output="$(diagnose_json)"
+render_markdown <<<"${diagnose_output}"
 
 abs_out="$(readlink -f "${OUT}")"
 echo "Wrote policy report ${abs_out}"

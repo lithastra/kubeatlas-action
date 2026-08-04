@@ -55,11 +55,21 @@ jobs:
           kubectl create deployment hello -n demo --image=nginx:alpine
           kubectl rollout status deploy/hello -n demo --timeout=120s
 
+      - name: Prepare isolated download temporary directory
+        run: mkdir -p "${{ runner.temp }}/kubeatlas-action-downloads"
+
       - name: Run the action against the kind cluster
         id: kubeatlas
         uses: ./
+        env:
+          # Keep mktemp output isolated so the next step can assert
+          # that both download paths clean up after themselves.
+          TMPDIR: ${{ runner.temp }}/kubeatlas-action-downloads
         with:
-          version: latest
+          # Pin the real published asset exercised by this regression
+          # test. The moving "latest" release must not change the
+          # behaviour under test between otherwise identical runs.
+          version: v1.5.0
           scope: namespace:demo
           output: artifacts/demo.svg
           policy-report: 'true'
@@ -84,6 +94,16 @@ jobs:
           test -n "${REPORT}"
           test -s "${REPORT}"
           grep -q 'KubeAtlas policy report' "${REPORT}"
+
+      - name: Verify download temporary directories were removed
+        env:
+          TMPDIR: ${{ runner.temp }}/kubeatlas-action-downloads
+        run: |
+          if find "${TMPDIR}" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+            echo "::error::download temporary directory was not cleaned up"
+            find "${TMPDIR}" -mindepth 1 -maxdepth 1 -print
+            exit 1
+          fi
 
       - name: Upload SVG for inspection
         if: always()
