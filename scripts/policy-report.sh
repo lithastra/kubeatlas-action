@@ -105,7 +105,7 @@ install_kubeatlas() {
     curl -fsSL -o "${tmp}/${archive}" "${url}"
     curl -fsSL -o "${tmp}/checksums.txt" \
       "https://github.com/${REPO}/releases/download/${want}/checksums.txt"
-    ( cd "${tmp}" && grep -F "${archive}" checksums.txt | sha256sum -c - )
+    ( cd "${tmp}" && grep -F "${archive}" checksums.txt | sha256sum -c - ) >&2
 
     tar -xzf "${tmp}/${archive}" -C "${tmp}"
     mkdir -p "${bin_dir}"
@@ -124,6 +124,11 @@ install_kubeatlas() {
 render_markdown() {
   local diag
   diag="$(cat)"
+
+  if ! jq -e 'type == "object"' >/dev/null <<<"${diag}"; then
+    echo "policy-report.sh: diagnose did not return a JSON object" >&2
+    return 1
+  fi
 
   {
     echo "### KubeAtlas policy report"

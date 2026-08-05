@@ -53,6 +53,7 @@ mkdir -p "$(dirname "${OUT}")"
 # kubeatlas-<scope>.svg name, so the OUT override happens here, not
 # in the plugin invocation.
 workdir="$(mktemp -d)"
+trap 'rm -rf "${workdir}"' EXIT
 ( cd "${workdir}" && kubectl-atlas "${args[@]}" )
 
 # kubectl-atlas writes kubeatlas-cluster.svg / kubeatlas-<ns>.svg /

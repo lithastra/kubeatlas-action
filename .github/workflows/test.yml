@@ -39,6 +39,17 @@ jobs:
           grep -q '/K8sRequiredLabels/must-have-owner | petclinic/Deployment/api' policy-report.md
           grep -q '2 policy violation' policy-report.md
 
+      - name: Policy report rejects invalid diagnose output
+        env:
+          KUBEATLAS_POLICY_REPORT_JSON: /dev/null
+          KUBEATLAS_ACTION_SCOPE: cluster
+          KUBEATLAS_POLICY_REPORT_OUTPUT: /tmp/invalid-policy-report.md
+        run: |
+          if scripts/policy-report.sh; then
+            echo "::error::policy report accepted invalid diagnose JSON"
+            exit 1
+          fi
+
   smoke:
     name: Smoke test against kind
     runs-on: ubuntu-latest
