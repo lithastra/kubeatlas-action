@@ -1,13 +1,16 @@
 name: Release
 
-# When a vX.Y.Z tag is pushed, advance the matching vX major-version
-# moving tag so users pinning @v1 always get the latest v1.* release.
-# The exact tag (the trigger) stays immutable.
+# Promote a verified vX.Y.Z tag to the matching vX moving tag. Keeping
+# promotion manual lets maintainers test the immutable release tag before
+# users pinned to @v1 receive it.
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Immutable release tag to promote, for example v1.0.1
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -23,19 +26,35 @@ jobs:
       - name: Resolve major version
         id: ver
         env:
-          REF: ${{ github.ref }}
+          TAG: ${{ inputs.tag }}
         run: |
-          tag="${REF#refs/tags/}"
-          major="${tag%%.*}"
-          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
-          echo "major=${major}" >> "${GITHUB_OUTPUT}"
+          set -euo pipefail
+          if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag '${TAG}' must match vX.Y.Z"
+            exit 1
+          fi
+          git fetch --force origin "refs/tags/${TAG}:refs/tags/${TAG}"
+          commit="$(git rev-parse "refs/tags/${TAG}^{commit}")"
+          if ! git merge-base --is-ancestor "${commit}" origin/main; then
+            echo "::error::Tag '${TAG}' is not on the main branch"
+            exit 1
+          fi
+          major="${TAG%%.*}"
+          {
+            echo "tag=${TAG}"
+            echo "major=${major}"
+            echo "commit=${commit}"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Move major tag
         env:
           MAJOR: ${{ steps.ver.outputs.major }}
           TAG: ${{ steps.ver.outputs.tag }}
+          COMMIT: ${{ steps.ver.outputs.commit }}
         run: |
+          set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git tag -f "${MAJOR}" "${TAG}"
-          git push -f origin "${MAJOR}"
+          git tag -f "${MAJOR}" "${COMMIT}"
+          git push --force origin "refs/tags/${MAJOR}"
+          echo "Promoted ${MAJOR} to ${TAG} (${COMMIT})"
