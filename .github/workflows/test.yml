@@ -31,7 +31,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: npx commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+        run: npx commitlint --extends '@commitlint/config-conventional' --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
 
   dco-check:
     name: All commits signed off (DCO)
