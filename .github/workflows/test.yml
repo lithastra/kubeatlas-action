@@ -39,6 +39,17 @@ jobs:
           grep -q '/K8sRequiredLabels/must-have-owner | petclinic/Deployment/api' policy-report.md
           grep -q '2 policy violation' policy-report.md
 
+      - name: Policy report rejects invalid diagnose output
+        env:
+          KUBEATLAS_POLICY_REPORT_JSON: /dev/null
+          KUBEATLAS_ACTION_SCOPE: cluster
+          KUBEATLAS_POLICY_REPORT_OUTPUT: /tmp/invalid-policy-report.md
+        run: |
+          if scripts/policy-report.sh; then
+            echo "::error::policy report accepted invalid diagnose JSON"
+            exit 1
+          fi
+
   smoke:
     name: Smoke test against kind
     runs-on: ubuntu-latest
@@ -55,11 +66,21 @@ jobs:
           kubectl create deployment hello -n demo --image=nginx:alpine
           kubectl rollout status deploy/hello -n demo --timeout=120s
 
+      - name: Prepare isolated download temporary directory
+        run: mkdir -p "${{ runner.temp }}/kubeatlas-action-downloads"
+
       - name: Run the action against the kind cluster
         id: kubeatlas
         uses: ./
+        env:
+          # Keep mktemp output isolated so the next step can assert
+          # that both download paths clean up after themselves.
+          TMPDIR: ${{ runner.temp }}/kubeatlas-action-downloads
         with:
-          version: latest
+          # Pin the real published asset exercised by this regression
+          # test. The moving "latest" release must not change the
+          # behaviour under test between otherwise identical runs.
+          version: v1.5.0
           scope: namespace:demo
           output: artifacts/demo.svg
           policy-report: 'true'
@@ -84,6 +105,16 @@ jobs:
           test -n "${REPORT}"
           test -s "${REPORT}"
           grep -q 'KubeAtlas policy report' "${REPORT}"
+
+      - name: Verify download temporary directories were removed
+        env:
+          TMPDIR: ${{ runner.temp }}/kubeatlas-action-downloads
+        run: |
+          if find "${TMPDIR}" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+            echo "::error::download temporary directory was not cleaned up"
+            find "${TMPDIR}" -mindepth 1 -maxdepth 1 -print
+            exit 1
+          fi
 
       - name: Upload SVG for inspection
         if: always()
