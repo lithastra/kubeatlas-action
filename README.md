@@ -140,7 +140,7 @@ A full workflow is in [`examples/policy-report-comment.yml`](./examples/policy-r
 ```yaml
 - uses: lithastra/kubeatlas-action@v1
   with:
-    version: v1.3.0
+    version: v1.5.2
 ```
 
 ## Requirements
