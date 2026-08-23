@@ -128,7 +128,7 @@ jobs:
           # Pin the real published asset exercised by this regression
           # test. The moving "latest" release must not change the
           # behaviour under test between otherwise identical runs.
-          version: v1.5.1
+          version: v1.5.2
           scope: namespace:demo
           output: artifacts/demo.svg
           policy-report: 'true'
